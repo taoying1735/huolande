@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>霍兰德职业兴趣测评 - 职业性格测试 | 职业规划测评工具</title>
+    <meta name="description" content="免费在线霍兰德职业兴趣测评，科学的职业性格测试，帮助你找到最适合的职业方向。提供简易版、标准版和专业版测评，深入分析你的职业兴趣类型（RIASEC）。" />
+    <meta name="keywords" content="霍兰德职业兴趣测评,职业性格测试,职业规划测评,RIASEC测试,职业倾向测试,职业生涯规划,职业咨询,霍兰德代码" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <!-- 添加错误处理脚本 -->
+    <script>
+      window.addEventListener('error', function(event) {
+        console.error('全局错误:', event.error);
+        // 如果页面是空白的，显示一个基本的错误信息
+        if (document.body.innerHTML.trim() === '<div id="root"></div>') {
+          document.body.innerHTML = `
+            <div style="text-align: center; padding: 50px; font-family: sans-serif;">
+              <h1>出错了</h1>
+              <p>应用加载时发生错误，请尝试刷新页面或清除浏览器缓存。</p>
+              <button onclick="window.location.reload()" style="padding: 10px 20px; margin-top: 20px; cursor: pointer;">
+                刷新页面
+              </button>
+            </div>
+          `;
+        }
+      });
+    </script>
+  </body>
+</html>
