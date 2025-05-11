@@ -24,13 +24,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <BarChart className="h-5 w-5 mr-1" />
                 测评记录
               </Link>
-              <Link
-                to="/profile"
-                className="flex items-center text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                <User className="h-5 w-5 mr-1" />
-                个人中心
-              </Link>
             </div>
           </div>
         </div>
