@@ -22,8 +22,8 @@ const assessmentTypes = [
   {
     type: 'professional',
     title: '专业版评估',
-    description: '180个专业评估题目，深入的个性特征分析和职业发展建议',
-    duration: '18分钟',
+    description: '99个专业评估题目，深入的个性特征分析和职业发展建议',
+    duration: '10分钟',
     icon: Brain,
     features: ['全面职业性格测评', '详细个性特征分析', '职业倾向深度报告', '具体职业规划建议', '发展路径推荐'],
   },

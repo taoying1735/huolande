@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAssessmentStore } from '../store';
-import type { Question } from '../types';
+import type { Question, AssessmentType, HollandCode, QuestionResponse } from '../types';
 import { calculateResults } from '../utils/calculateResults';
 
 const questions: Record<string, Question[]> = {
@@ -189,89 +189,6 @@ const questions: Record<string, Question[]> = {
     { id: 97, text: '我喜欢参与志愿服务', type: 'S' },
     { id: 98, text: '我喜欢照顾他人', type: 'S' },
     { id: 99, text: '我喜欢促进团队合作', type: 'S' },
-    { id: 100, text: '我喜欢解决人际关系问题', type: 'S' },
-    { id: 101, text: '我喜欢组织社交活动', type: 'S' },
-    { id: 102, text: '我喜欢辅导学生', type: 'S' },
-    { id: 103, text: '我喜欢照顾老人', type: 'S' },
-    { id: 104, text: '我喜欢照顾儿童', type: 'S' },
-    { id: 105, text: '我喜欢心理咨询', type: 'S' },
-    { id: 106, text: '我喜欢社会工作', type: 'S' },
-    { id: 107, text: '我喜欢医疗护理', type: 'S' },
-    { id: 108, text: '我喜欢社区服务', type: 'S' },
-    { id: 109, text: '我喜欢公益活动', type: 'S' },
-    { id: 110, text: '我喜欢人际沟通', type: 'S' },
-    { id: 111, text: '我喜欢团队建设', type: 'S' },
-    { id: 112, text: '我喜欢调解纠纷', type: 'S' },
-    { id: 113, text: '我喜欢社会服务', type: 'S' },
-    { id: 114, text: '我喜欢教育工作', type: 'S' },
-    { id: 115, text: '我喜欢康复治疗', type: 'S' },
-    { id: 116, text: '我喜欢心理辅导', type: 'S' },
-    { id: 117, text: '我喜欢社会关怀', type: 'S' },
-    { id: 118, text: '我喜欢人文关怀', type: 'S' },
-    { id: 119, text: '我喜欢慈善工作', type: 'S' },
-    { id: 120, text: '我喜欢社会公益', type: 'S' },
-    // 企业型(E) - 30题
-    { id: 121, text: '我喜欢领导团队', type: 'E' },
-    { id: 122, text: '我喜欢制定目标和计划', type: 'E' },
-    { id: 123, text: '我喜欢说服他人', type: 'E' },
-    { id: 124, text: '我喜欢做决策', type: 'E' },
-    { id: 125, text: '我喜欢组织活动', type: 'E' },
-    { id: 126, text: '我喜欢竞争和挑战', type: 'E' },
-    { id: 127, text: '我喜欢管理项目', type: 'E' },
-    { id: 128, text: '我喜欢影响他人', type: 'E' },
-    { id: 129, text: '我喜欢承担责任', type: 'E' },
-    { id: 130, text: '我喜欢开拓新的业务', type: 'E' },
-    { id: 131, text: '我喜欢商业谈判', type: 'E' },
-    { id: 132, text: '我喜欢市场营销', type: 'E' },
-    { id: 133, text: '我喜欢企业管理', type: 'E' },
-    { id: 134, text: '我喜欢风险投资', type: 'E' },
-    { id: 135, text: '我喜欢创业活动', type: 'E' },
-    { id: 136, text: '我喜欢品牌推广', type: 'E' },
-    { id: 137, text: '我喜欢销售工作', type: 'E' },
-    { id: 138, text: '我喜欢商业策划', type: 'E' },
-    { id: 139, text: '我喜欢项目管理', type: 'E' },
-    { id: 140, text: '我喜欢团队管理', type: 'E' },
-    { id: 141, text: '我喜欢资源整合', type: 'E' },
-    { id: 142, text: '我喜欢商业分析', type: 'E' },
-    { id: 143, text: '我喜欢战略规划', type: 'E' },
-    { id: 144, text: '我喜欢业务拓展', type: 'E' },
-    { id: 145, text: '我喜欢商业运营', type: 'E' },
-    { id: 146, text: '我喜欢投资理财', type: 'E' },
-    { id: 147, text: '我喜欢商业创新', type: 'E' },
-    { id: 148, text: '我喜欢企业发展', type: 'E' },
-    { id: 149, text: '我喜欢商业合作', type: 'E' },
-    { id: 150, text: '我喜欢商业竞争', type: 'E' },
-    // 常规型(C) - 30题
-    { id: 151, text: '我喜欢按规则办事', type: 'C' },
-    { id: 152, text: '我喜欢整理和归类信息', type: 'C' },
-    { id: 153, text: '我喜欢处理细节', type: 'C' },
-    { id: 154, text: '我喜欢保持秩序', type: 'C' },
-    { id: 155, text: '我喜欢遵循程序', type: 'C' },
-    { id: 156, text: '我喜欢系统化工作', type: 'C' },
-    { id: 157, text: '我喜欢精确的工作', type: 'C' },
-    { id: 158, text: '我喜欢检查和核实', type: 'C' },
-    { id: 159, text: '我喜欢有条理的环境', type: 'C' },
-    { id: 160, text: '我喜欢按计划完成任务', type: 'C' },
-    { id: 161, text: '我喜欢数据管理', type: 'C' },
-    { id: 162, text: '我喜欢文件归档', type: 'C' },
-    { id: 163, text: '我喜欢财务记录', type: 'C' },
-    { id: 164, text: '我喜欢质量控制', type: 'C' },
-    { id: 165, text: '我喜欢流程管理', type: 'C' },
-    { id: 166, text: '我喜欢标准化工作', type: 'C' },
-    { id: 167, text: '我喜欢行政管理', type: 'C' },
-    { id: 168, text: '我喜欢规范操作', type: 'C' },
-    { id: 169, text: '我喜欢制度执行', type: 'C' },
-    { id: 170, text: '我喜欢程序管理', type: 'C' },
-    { id: 171, text: '我喜欢资料整理', type: 'C' },
-    { id: 172, text: '我喜欢档案管理', type: 'C' },
-    { id: 173, text: '我喜欢表格制作', type: 'C' },
-    { id: 174, text: '我喜欢数据统计', type: 'C' },
-    { id: 175, text: '我喜欢预算管理', type: 'C' },
-    { id: 176, text: '我喜欢成本控制', type: 'C' },
-    { id: 177, text: '我喜欢库存管理', type: 'C' },
-    { id: 178, text: '我喜欢信息管理', type: 'C' },
-    { id: 179, text: '我喜欢时间管理', type: 'C' },
-    { id: 180, text: '我喜欢项目监控', type: 'C' },
   ],
 };
 
@@ -297,7 +214,7 @@ export function Assessment() {
 
   const handleAnswer = (answer: boolean) => {
     // 添加回答
-    const response = {
+    const response: QuestionResponse = {
       questionId: assessmentQuestions[currentQuestion].id,
       answer,
       questionType: assessmentQuestions[currentQuestion].type as HollandCode

@@ -49,7 +49,7 @@ export interface HollandAnalysis {
   };
 }
 
-export type Response = {
+export type QuestionResponse = {
   questionId: number;
   answer: boolean;
   questionType?: HollandCode;

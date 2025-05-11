@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Assessment, UserResponse, AssessmentResult, AssessmentType, Response } from './types';
+import type { Assessment, UserResponse, AssessmentResult, AssessmentType, QuestionResponse } from './types';
 
 interface AssessmentStore {
   currentAssessment: {
@@ -8,10 +8,10 @@ interface AssessmentStore {
     title: string;
     description: string;
   } | null;
-  responses: Response[];
+  responses: QuestionResponse[];
   results: AssessmentResult | null;
   setCurrentAssessment: (assessment: { type: AssessmentType; title: string; description: string }) => void;
-  addResponse: (response: Response) => void;
+  addResponse: (response: QuestionResponse) => void;
   setResults: (results: AssessmentResult) => void;
   resetAssessment: () => void;
 }
