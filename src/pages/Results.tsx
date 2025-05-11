@@ -1,11 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom'; // Import useLocation
 import { useAssessmentStore } from '../store';
 import { hollandTraits, getTopTwoHollandCodes, getCombinationAnalysis } from '../utils/hollandAnalysis';
-import { HollandCode, HollandAnalysis } from '../types';
+import { HollandCode, HollandAnalysis, AssessmentResult } from '../types'; // Import AssessmentResult
 import html2canvas from 'html2canvas';
 
 export function Results() {
-  const { results } = useAssessmentStore();
+  const { assessmentHistory, latestResult } = useAssessmentStore();
+  const location = useLocation(); // Get location object
+  const [currentResult, setCurrentResult] = useState<AssessmentResult | null | undefined>(undefined); // undefined for loading, null for not found
   const [analysis, setAnalysis] = useState<HollandAnalysis | null>(null);
   const [error, setError] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
@@ -13,20 +16,44 @@ export function Results() {
   const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      if (results) {
-        const combination = getTopTwoHollandCodes(results.scores);
+    const params = new URLSearchParams(location.search);
+    const resultIdFromUrl = params.get('resultId');
+
+    let foundResult: AssessmentResult | null | undefined = undefined;
+
+    if (resultIdFromUrl) {
+      foundResult = assessmentHistory.find(r => r.id === resultIdFromUrl) || null;
+    } else if (latestResult) {
+      foundResult = latestResult;
+    } else if (assessmentHistory.length > 0) {
+      // Fallback to the most recent in history if no ID and no latestResult (should ideally not happen if latestResult is set)
+      foundResult = assessmentHistory[assessmentHistory.length - 1];
+    } else {
+      foundResult = null; // No results available
+    }
+    
+    setCurrentResult(foundResult);
+
+    if (foundResult) {
+      try {
+        const combination = getTopTwoHollandCodes(foundResult.scores);
         const analysisResult = getCombinationAnalysis(combination);
         setAnalysis(analysisResult);
+        setError(false);
+      } catch (err) {
+        console.error('分析结果时出错:', err);
+        setError(true);
+        setAnalysis(null);
       }
-    } catch (err) {
-      console.error('分析结果时出错:', err);
-      setError(true);
+    } else {
+      // If no result is found (e.g. invalid resultId or no history/latest)
+      // setError(true); // Or handle as "Result not found"
+      setAnalysis(null); // Ensure no stale analysis is shown
     }
-  }, [results]);
+  }, [location.search, assessmentHistory, latestResult]);
 
   const handleDownloadReport = async () => {
-    if (!reportRef.current) return;
+    if (!reportRef.current || !currentResult) return; // Check currentResult
     
     try {
       const loadingToast = document.createElement('div');
@@ -45,7 +72,7 @@ export function Results() {
       
       const link = document.createElement('a');
       link.href = image;
-      link.download = `霍兰德职业兴趣测评报告_${results.hollandCode}_${new Date().toLocaleDateString()}.png`;
+      link.download = `霍兰德职业兴趣测评报告_${currentResult.hollandCode}_${new Date().toLocaleDateString()}.png`;
       link.click();
       
       document.body.removeChild(loadingToast);
@@ -65,7 +92,8 @@ export function Results() {
   };
 
   const handleShare = async (platform: 'wechat' | 'weibo' | 'copy') => {
-    const shareTitle = `我的霍兰德职业兴趣测评结果: ${results.hollandCode}`;
+    if (!currentResult) return; // Check currentResult
+    const shareTitle = `我的霍兰德职业兴趣测评结果: ${currentResult.hollandCode}`;
     const shareUrl = window.location.href;
     const shareDesc = `${analysis?.description.slice(0, 50)}...`;
     
@@ -97,7 +125,7 @@ export function Results() {
     }
   };
 
-  if (!results) {
+  if (currentResult === undefined) { // Still loading/determining which result to show
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="text-xl">加载中...</div>
@@ -105,7 +133,20 @@ export function Results() {
     );
   }
 
-  if (error) {
+  if (!currentResult) { // No result found (e.g. invalid ID or no history)
+    return (
+      <div className="flex flex-col justify-center items-center h-screen">
+        <div className="text-xl mb-4">测评结果未找到</div>
+        <div className="text-sm text-gray-500 mb-4">
+          无法找到对应的测评结果，请检查链接或返回首页。
+        </div>
+        {/* Optional: Add a link to go back or to dashboard */}
+      </div>
+    );
+  }
+  
+  // Error state for when analysis fails for a found result
+  if (error && currentResult) {
     return (
       <div className="flex flex-col justify-center items-center h-screen">
         <div className="text-xl mb-4">出错了</div>
@@ -122,16 +163,40 @@ export function Results() {
     );
   }
 
-  if (!analysis) {
+  // Analysis might still be null if getCombinationAnalysis returned null or if result was found but analysis failed
+  if (!analysis && currentResult && !error) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="text-xl">分析结果中...</div>
       </div>
     );
   }
+  
+  // If analysis is null AND there was an error processing a valid currentResult
+  if (!analysis && error && currentResult) {
+    return (
+       <div className="flex flex-col justify-center items-center h-screen">
+        <div className="text-xl mb-4">分析结果时出错</div>
+        <div className="text-sm text-gray-500 mb-4">
+          我们无法分析您的测评结果，请稍后重试。
+        </div>
+      </div>
+    )
+  }
+  
+  // If somehow currentResult is valid, no error, but analysis is still null (should be caught by "分析结果中...")
+  // This is a fallback, ideally the states above cover all scenarios.
+  if (!analysis) {
+     return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-xl">无法显示结果分析。</div>
+      </div>
+    );
+  }
 
-  const isStandard = results.assessmentType === 'standard';
-  const isProfessional = results.assessmentType === 'professional';
+
+  const isStandard = currentResult.assessmentType === 'standard';
+  const isProfessional = currentResult.assessmentType === 'professional';
 
   return (
     <div className="max-w-4xl mx-auto p-4">
@@ -166,28 +231,28 @@ export function Results() {
         <div id="personality" className="mb-8">
           <h2 className="text-xl font-semibold mb-4">霍兰德代码</h2>
           <div className="text-4xl font-bold text-indigo-600">
-            {results.hollandCode || '未知'}
+            {currentResult.hollandCode || '未知'}
           </div>
           
           <div className="mt-4 p-4 bg-indigo-50 rounded-lg">
             <p className="font-medium mb-2">您的霍兰德代码解释：</p>
             <div className="space-y-2">
-              {results.hollandCode.includes('R') && (
+              {currentResult.hollandCode.includes('R') && (
                 <p><span className="font-semibold">R (现实型):</span> 喜欢具体、实际的工作，善于使用工具和机械设备。</p>
               )}
-              {results.hollandCode.includes('I') && (
+              {currentResult.hollandCode.includes('I') && (
                 <p><span className="font-semibold">I (研究型):</span> 喜欢分析和解决复杂问题，善于思考和研究。</p>
               )}
-              {results.hollandCode.includes('A') && (
+              {currentResult.hollandCode.includes('A') && (
                 <p><span className="font-semibold">A (艺术型):</span> 具有创造力和想象力，喜欢表达自我和创新。</p>
               )}
-              {results.hollandCode.includes('S') && (
+              {currentResult.hollandCode.includes('S') && (
                 <p><span className="font-semibold">S (社会型):</span> 喜欢与人交往和帮助他人，善于沟通和合作。</p>
               )}
-              {results.hollandCode.includes('E') && (
+              {currentResult.hollandCode.includes('E') && (
                 <p><span className="font-semibold">E (企业型):</span> 具有领导能力和说服力，喜欢组织和管理。</p>
               )}
-              {results.hollandCode.includes('C') && (
+              {currentResult.hollandCode.includes('C') && (
                 <p><span className="font-semibold">C (常规型):</span> 喜欢有序和规范的工作，善于处理细节和数据。</p>
               )}
             </div>
@@ -234,22 +299,22 @@ export function Results() {
           <div className="p-5 bg-blue-50 rounded-lg">
             <p className="text-gray-800 mb-4">根据您的霍兰德代码，您可能具有以下职业倾向：</p>
             <div className="space-y-3">
-              {results.hollandCode.charAt(0) === 'R' && (
+              {currentResult.hollandCode.charAt(0) === 'R' && (
                 <p>您倾向于从事需要动手能力和技术技能的工作，喜欢解决具体问题。</p>
               )}
-              {results.hollandCode.charAt(0) === 'I' && (
+              {currentResult.hollandCode.charAt(0) === 'I' && (
                 <p>您倾向于从事需要分析思考和研究的工作，喜欢解决复杂问题。</p>
               )}
-              {results.hollandCode.charAt(0) === 'A' && (
+              {currentResult.hollandCode.charAt(0) === 'A' && (
                 <p>您倾向于从事需要创造力和艺术表达的工作，喜欢创新和自我表达。</p>
               )}
-              {results.hollandCode.charAt(0) === 'S' && (
+              {currentResult.hollandCode.charAt(0) === 'S' && (
                 <p>您倾向于从事需要人际交往和帮助他人的工作，喜欢团队合作。</p>
               )}
-              {results.hollandCode.charAt(0) === 'E' && (
+              {currentResult.hollandCode.charAt(0) === 'E' && (
                 <p>您倾向于从事需要领导能力和决策能力的工作，喜欢管理和影响他人。</p>
               )}
-              {results.hollandCode.charAt(0) === 'C' && (
+              {currentResult.hollandCode.charAt(0) === 'C' && (
                 <p>您倾向于从事需要条理性和细节关注的工作，喜欢有序和规范。</p>
               )}
             </div>
@@ -260,7 +325,7 @@ export function Results() {
           <h2 className="text-xl font-semibold mb-4">适合的工作环境</h2>
           <div className="p-5 border border-gray-200 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {results.hollandCode.charAt(0) === 'R' && (
+              {currentResult.hollandCode.charAt(0) === 'R' && (
                 <>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <p>技术导向的工作环境</p>
@@ -270,7 +335,7 @@ export function Results() {
                   </div>
                 </>
               )}
-              {results.hollandCode.charAt(0) === 'I' && (
+              {currentResult.hollandCode.charAt(0) === 'I' && (
                 <>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <p>研究机构或实验室</p>
@@ -280,7 +345,7 @@ export function Results() {
                   </div>
                 </>
               )}
-              {results.hollandCode.charAt(0) === 'A' && (
+              {currentResult.hollandCode.charAt(0) === 'A' && (
                 <>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <p>创意工作室或设计部门</p>
@@ -290,7 +355,7 @@ export function Results() {
                   </div>
                 </>
               )}
-              {results.hollandCode.charAt(0) === 'S' && (
+              {currentResult.hollandCode.charAt(0) === 'S' && (
                 <>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <p>教育或社会服务机构</p>
@@ -300,7 +365,7 @@ export function Results() {
                   </div>
                 </>
               )}
-              {results.hollandCode.charAt(0) === 'E' && (
+              {currentResult.hollandCode.charAt(0) === 'E' && (
                 <>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <p>商业或管理环境</p>
@@ -310,7 +375,7 @@ export function Results() {
                   </div>
                 </>
               )}
-              {results.hollandCode.charAt(0) === 'C' && (
+              {currentResult.hollandCode.charAt(0) === 'C' && (
                 <>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <p>结构化的办公环境</p>
@@ -361,7 +426,7 @@ export function Results() {
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-4">个人优势与潜能</h2>
               <div className="p-5 bg-indigo-50 rounded-lg">
-                <p className="text-gray-800 mb-4">基于您的霍兰德代码 <span className="font-semibold">{results.hollandCode}</span>，您的核心优势可能包括：</p>
+                <p className="text-gray-800 mb-4">基于您的霍兰德代码 <span className="font-semibold">{currentResult.hollandCode}</span>，您的核心优势可能包括：</p>
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   {analysis.strengths.map((strength, index) => (
                     <div key={index} className="flex items-start gap-2">
@@ -428,30 +493,30 @@ export function Results() {
             <div id="report" className="mb-8">
               <h2 className="text-xl font-semibold mb-4">职业倾向深度报告</h2>
               <div className="p-5 bg-yellow-50 rounded-lg">
-                <p className="text-gray-800 mb-4">基于您的霍兰德代码 <span className="font-semibold">{results.hollandCode}</span>，我们对您的职业倾向进行了深入分析：</p>
+                <p className="text-gray-800 mb-4">基于您的霍兰德代码 <span className="font-semibold">{currentResult.hollandCode}</span>，我们对您的职业倾向进行了深入分析：</p>
                 
                 <div className="space-y-4">
                   <div>
                     <h3 className="font-medium text-lg text-yellow-800 mb-2">主导特质</h3>
                     <p className="text-gray-700">
-                      {results.hollandCode.charAt(0) === 'R' && "您的主导特质是现实型(R)，表现为喜欢具体、实际的工作，善于使用工具和机械设备，注重实际成果。"}
-                      {results.hollandCode.charAt(0) === 'I' && "您的主导特质是研究型(I)，表现为喜欢分析和解决复杂问题，善于思考和研究，注重知识和理论。"}
-                      {results.hollandCode.charAt(0) === 'A' && "您的主导特质是艺术型(A)，表现为具有创造力和想象力，喜欢表达自我，注重美感和创新。"}
-                      {results.hollandCode.charAt(0) === 'S' && "您的主导特质是社会型(S)，表现为喜欢与人交往和帮助他人，善于沟通和合作，注重人际关系。"}
-                      {results.hollandCode.charAt(0) === 'E' && "您的主导特质是企业型(E)，表现为具有领导能力和说服力，喜欢组织和管理，注重成就和影响力。"}
-                      {results.hollandCode.charAt(0) === 'C' && "您的主导特质是常规型(C)，表现为喜欢有序和规范的工作，善于处理细节和数据，注重精确和可靠。"}
+                      {currentResult.hollandCode.charAt(0) === 'R' && "您的主导特质是现实型(R)，表现为喜欢具体、实际的工作，善于使用工具和机械设备，注重实际成果。"}
+                      {currentResult.hollandCode.charAt(0) === 'I' && "您的主导特质是研究型(I)，表现为喜欢分析和解决复杂问题，善于思考和研究，注重知识和理论。"}
+                      {currentResult.hollandCode.charAt(0) === 'A' && "您的主导特质是艺术型(A)，表现为具有创造力和想象力，喜欢表达自我，注重美感和创新。"}
+                      {currentResult.hollandCode.charAt(0) === 'S' && "您的主导特质是社会型(S)，表现为喜欢与人交往和帮助他人，善于沟通和合作，注重人际关系。"}
+                      {currentResult.hollandCode.charAt(0) === 'E' && "您的主导特质是企业型(E)，表现为具有领导能力和说服力，喜欢组织和管理，注重成就和影响力。"}
+                      {currentResult.hollandCode.charAt(0) === 'C' && "您的主导特质是常规型(C)，表现为喜欢有序和规范的工作，善于处理细节和数据，注重精确和可靠。"}
                     </p>
                   </div>
                   
                   <div>
                     <h3 className="font-medium text-lg text-yellow-800 mb-2">辅助特质</h3>
                     <p className="text-gray-700">
-                      {results.hollandCode.charAt(1) === 'R' && "您的辅助特质是现实型(R)，增强了您处理实际问题的能力，使您在工作中更加注重实用性和效率。"}
-                      {results.hollandCode.charAt(1) === 'I' && "您的辅助特质是研究型(I)，增强了您的分析能力，使您在工作中更加注重逻辑思考和问题解决。"}
-                      {results.hollandCode.charAt(1) === 'A' && "您的辅助特质是艺术型(A)，增强了您的创造力，使您在工作中更加注重创新和个性化表达。"}
-                      {results.hollandCode.charAt(1) === 'S' && "您的辅助特质是社会型(S)，增强了您的人际交往能力，使您在工作中更加注重团队合作和人际关系。"}
-                      {results.hollandCode.charAt(1) === 'E' && "您的辅助特质是企业型(E)，增强了您的领导能力，使您在工作中更加注重目标达成和影响力。"}
-                      {results.hollandCode.charAt(1) === 'C' && "您的辅助特质是常规型(C)，增强了您的组织能力，使您在工作中更加注重秩序和细节。"}
+                      {currentResult.hollandCode.charAt(1) === 'R' && "您的辅助特质是现实型(R)，增强了您处理实际问题的能力，使您在工作中更加注重实用性和效率。"}
+                      {currentResult.hollandCode.charAt(1) === 'I' && "您的辅助特质是研究型(I)，增强了您的分析能力，使您在工作中更加注重逻辑思考和问题解决。"}
+                      {currentResult.hollandCode.charAt(1) === 'A' && "您的辅助特质是艺术型(A)，增强了您的创造力，使您在工作中更加注重创新和个性化表达。"}
+                      {currentResult.hollandCode.charAt(1) === 'S' && "您的辅助特质是社会型(S)，增强了您的人际交往能力，使您在工作中更加注重团队合作和人际关系。"}
+                      {currentResult.hollandCode.charAt(1) === 'E' && "您的辅助特质是企业型(E)，增强了您的领导能力，使您在工作中更加注重目标达成和影响力。"}
+                      {currentResult.hollandCode.charAt(1) === 'C' && "您的辅助特质是常规型(C)，增强了您的组织能力，使您在工作中更加注重秩序和细节。"}
                     </p>
                   </div>
                   
@@ -489,7 +554,7 @@ export function Results() {
                   <div className="bg-white p-4 rounded-lg shadow-sm">
                     <h3 className="font-medium text-lg text-red-800 mb-2">低适应性职业领域</h3>
                     <div className="space-y-2">
-                      {results.hollandCode.charAt(0) === 'R' && (
+                      {currentResult.hollandCode.charAt(0) === 'R' && (
                         <>
                           <div className="flex items-start gap-2">
                             <div className="mt-1 text-red-600">✗</div>
@@ -501,7 +566,7 @@ export function Results() {
                           </div>
                         </>
                       )}
-                      {results.hollandCode.charAt(0) === 'I' && (
+                      {currentResult.hollandCode.charAt(0) === 'I' && (
                         <>
                           <div className="flex items-start gap-2">
                             <div className="mt-1 text-red-600">✗</div>
@@ -513,7 +578,7 @@ export function Results() {
                           </div>
                         </>
                       )}
-                      {results.hollandCode.charAt(0) === 'A' && (
+                      {currentResult.hollandCode.charAt(0) === 'A' && (
                         <>
                           <div className="flex items-start gap-2">
                             <div className="mt-1 text-red-600">✗</div>
@@ -525,7 +590,7 @@ export function Results() {
                           </div>
                         </>
                       )}
-                      {results.hollandCode.charAt(0) === 'S' && (
+                      {currentResult.hollandCode.charAt(0) === 'S' && (
                         <>
                           <div className="flex items-start gap-2">
                             <div className="mt-1 text-red-600">✗</div>
@@ -537,7 +602,7 @@ export function Results() {
                           </div>
                         </>
                       )}
-                      {results.hollandCode.charAt(0) === 'E' && (
+                      {currentResult.hollandCode.charAt(0) === 'E' && (
                         <>
                           <div className="flex items-start gap-2">
                             <div className="mt-1 text-red-600">✗</div>
@@ -549,7 +614,7 @@ export function Results() {
                           </div>
                         </>
                       )}
-                      {results.hollandCode.charAt(0) === 'C' && (
+                      {currentResult.hollandCode.charAt(0) === 'C' && (
                         <>
                           <div className="flex items-start gap-2">
                             <div className="mt-1 text-red-600">✗</div>
@@ -576,37 +641,37 @@ export function Results() {
                   <div className="bg-white p-4 rounded-lg shadow-sm">
                     <h3 className="font-medium text-lg text-purple-800 mb-2">核心能力</h3>
                     <div className="space-y-2">
-                      {results.hollandCode.includes('R') && (
+                      {currentResult.hollandCode.includes('R') && (
                         <div className="flex items-start gap-2">
                           <div className="mt-1 text-purple-600 font-bold">•</div>
                           <p>技术操作与实践能力</p>
                         </div>
                       )}
-                      {results.hollandCode.includes('I') && (
+                      {currentResult.hollandCode.includes('I') && (
                         <div className="flex items-start gap-2">
                           <div className="mt-1 text-purple-600 font-bold">•</div>
                           <p>分析思考与问题解决能力</p>
                         </div>
                       )}
-                      {results.hollandCode.includes('A') && (
+                      {currentResult.hollandCode.includes('A') && (
                         <div className="flex items-start gap-2">
                           <div className="mt-1 text-purple-600 font-bold">•</div>
                           <p>创造力与艺术表达能力</p>
                         </div>
                       )}
-                      {results.hollandCode.includes('S') && (
+                      {currentResult.hollandCode.includes('S') && (
                         <div className="flex items-start gap-2">
                           <div className="mt-1 text-purple-600 font-bold">•</div>
                           <p>人际沟通与协作能力</p>
                         </div>
                       )}
-                      {results.hollandCode.includes('E') && (
+                      {currentResult.hollandCode.includes('E') && (
                         <div className="flex items-start gap-2">
                           <div className="mt-1 text-purple-600 font-bold">•</div>
                           <p>领导力与决策能力</p>
                         </div>
                       )}
-                      {results.hollandCode.includes('C') && (
+                      {currentResult.hollandCode.includes('C') && (
                         <div className="flex items-start gap-2">
                           <div className="mt-1 text-purple-600 font-bold">•</div>
                           <p>组织规划与执行能力</p>

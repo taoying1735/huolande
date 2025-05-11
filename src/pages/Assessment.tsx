@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAssessmentStore } from '../store';
-import type { Question, AssessmentType, HollandCode, QuestionResponse } from '../types';
+import type { Question, AssessmentType, HollandCode, QuestionResponse, AssessmentResult } from '../types';
 import { calculateResults } from '../utils/calculateResults';
 
 const questions: Record<string, Question[]> = {
@@ -196,7 +196,7 @@ export function Assessment() {
   const { type } = useParams<{ type: string }>();
   const navigate = useNavigate();
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const { addResponse, responses, setCurrentAssessment, setResults } = useAssessmentStore(); // Ensure that the responses are added to the global state when an answer is given.
+  const { addResponse, responses, setCurrentAssessment, addResultToHistory, setLatestResult } = useAssessmentStore();
 
   const assessmentQuestions = questions[type as keyof typeof questions] || [];
   
@@ -230,10 +230,13 @@ export function Assessment() {
       );
       console.log('Assessment页面计算的结果:', calculatedResults);
       console.log('测评类型设置为:', type);
-      setResults({
+      const finalResult: AssessmentResult = { // Ensure calculatedResults matches AssessmentResult structure
         ...calculatedResults,
-        assessmentType: type as AssessmentType // 确保明确设置
-      });
+        // id and userId are now set within calculateResults
+        // responses in AssessmentResult is UserResponse[], ensure calculatedResults provides this or transform here
+      };
+      addResultToHistory(finalResult);
+      // setLatestResult(finalResult); // setLatestResult is available if needed to specifically update only the latest
       navigate('/results');
     } else {
       setCurrentQuestion(currentQuestion + 1);

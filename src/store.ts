@@ -9,10 +9,12 @@ interface AssessmentStore {
     description: string;
   } | null;
   responses: QuestionResponse[];
-  results: AssessmentResult | null;
+  assessmentHistory: AssessmentResult[]; // Changed from results to assessmentHistory to store multiple results
+  latestResult: AssessmentResult | null; // To store the most recent single result if needed elsewhere
   setCurrentAssessment: (assessment: { type: AssessmentType; title: string; description: string }) => void;
   addResponse: (response: QuestionResponse) => void;
-  setResults: (results: AssessmentResult) => void;
+  addResultToHistory: (result: AssessmentResult) => void; // New action to add to history
+  setLatestResult: (result: AssessmentResult | null) => void; // Action to set the latest single result
   resetAssessment: () => void;
 }
 
@@ -21,15 +23,21 @@ export const useAssessmentStore = create<AssessmentStore>()(
     (set) => ({
       currentAssessment: null,
       responses: [],
-      results: null,
+      assessmentHistory: [], // Initialize as an empty array
+      latestResult: null,    // Initialize as null
       setCurrentAssessment: (assessment) => set({ currentAssessment: assessment }),
       addResponse: (response) =>
         set((state) => ({
           responses: [...state.responses, response],
         })),
-      setResults: (results) => set({ results }),
+      addResultToHistory: (result) => // Implementation for the new action
+        set((state) => ({
+          assessmentHistory: [...state.assessmentHistory, result],
+          latestResult: result, // Also update the latest result
+        })),
+      setLatestResult: (result) => set({ latestResult: result }), // Setter for latestResult
       resetAssessment: () =>
-        set({ currentAssessment: null, responses: [], results: null }),
+        set({ currentAssessment: null, responses: [], latestResult: null }), // Reset latestResult, keep history
     }),
     {
       name: 'assessment-store',
